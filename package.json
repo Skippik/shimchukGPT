@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "build": "yarn tsc",
-    "start": "node dist/app.js",
+    "start": "pm2 start ecosystem.config.js --only telegram-bo --env development",
     "dev": "concurrently \"tsc -w -p tsconfig.json\" \"supervisor --watch dist dist/app.js\"",
     "ts-start": "yarn tsc --w"
   },

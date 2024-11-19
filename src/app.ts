@@ -18,64 +18,70 @@ dotenv.config();
 const botToken = process.env.BOT_TOKEN as string;
 
 const bot = new Telegraf(botToken);
+//
+//
+const FORM_LINK =
+  'https://docs.google.com/spreadsheets/d/1xdCWrb6opUb7s5_542I5kxUEmNKI7r-WdIlOonO3v5M/edit?usp=sharing';
 
 // Обработчик для приветственного сообщения
 bot.start(ctx => {
-  const keyboard = createStartButton().resize();
+  // const keyboard = createStartButton().resize();
 
-  ctx.reply('Привет! Я ваш бот!!!!.', keyboard);
+  ctx.reply('Всем привет. 👋');
+});
+
+bot.on('new_chat_members', async ctx => {
+  // Вызываем функцию сбора данных при добавлении нового участника
+  await fetchAllMembers(ctx);
+  ctx.message.new_chat_members.forEach(newMember => {
+    const firstName = newMember.first_name || 'Новый участник';
+
+    const welcomeMessage = `Привет, ${firstName}! 👋\n\nМы тут собираемся на вечер встречи выпускников 2025 года, который состоится 1 февраля. Мы рады тебя видеть! 😊\n\nСейчас мы находимся в поисках всех людей из нашего выпуска. Если не трудно, перейди по ссылке и впиши имена тех, с кем ты учился, но их пока нет в общем списке: ${FORM_LINK}\n\nСпасибо! 🙌`;
+
+    // Отправляем сообщение в чат
+    ctx.reply(welcomeMessage);
+  });
 });
 
 //
-const escapeRegExp = (str: string) => {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-};
-
-// Обработчик события для кнопки
-bot.on(message('text'), async ctx => {
+const fetchAllMembers = async (ctx: {
+  chat: {id: any};
+  reply: (arg0: string) => void;
+}) => {
   try {
-    const messageId = ctx.message.message_id;
-    const chatId = ctx.message.chat.id;
-    const senderUsername =
-      ctx.message.from.username || 'нет_имени_пользователя';
+    const chatId = ctx.chat.id; // ID группы
+    const members = []; // Массив для хранения данных участников
 
-    if (ctx.message && ctx.message.text) {
-      const originalText = ctx.message.text;
+    // Внимание! Это пример для группы с известными ID участников
+    // В реальных сценариях Telegram API не позволяет получить полный список участников без доп. методов
+    const chatAdmins = await bot.telegram.getChatAdministrators(chatId);
+    const adminUserIds = chatAdmins.map(admin => admin.user.id);
 
-      // Экранирование специальных символов в запрещенных словах
-      const escapedBadWords = badWords.map(str => escapeRegExp(str));
-
-      // Проверка на наличие запрещенных слов и их замена на "Hi"
-      const filteredText = originalText.replace(
-        new RegExp(escapedBadWords.join('|'), 'gi'),
-        'Hi',
-      );
-
-      // Вывод в консоль оригинального и отфильтрованного текста
-      console.log('Оригинальный текст:', originalText);
-      console.log('Отфильтрованный текст:', filteredText);
-
-      // Отправка отфильтрованного текста в канал
-      if (originalText !== filteredText) {
-        ctx.reply(
-          `Пользователь ${senderUsername}: Отправил нехорошее слово в сообщении: ||${originalText}|| Поэтому я ShimchukGPT заменил его котиком 😻❤️ Всем добра\\! Не делай так больше ${senderUsername}`,
-          {
-            parse_mode: 'MarkdownV2',
-          },
-        );
-        await new Promise(r => setTimeout(r, 3000));
-
-        try {
-          await ctx.telegram.deleteMessage(chatId, messageId);
-        } catch (error) {
-          console.error('Ошибка при удалении сообщения:', error);
-        }
-      }
+    // Перебираем ID администраторов (пример)
+    for (const userId of adminUserIds) {
+      const memberInfo = await bot.telegram.getChatMember(chatId, userId);
+      members.push({
+        id: memberInfo.user.id,
+        first_name: memberInfo.user.first_name,
+        last_name: memberInfo.user.last_name || null,
+        username: memberInfo.user.username || null,
+        status: memberInfo.status,
+      });
     }
+
+    // Сохранение данных в файл
+    fs.writeFileSync('group_members.json', JSON.stringify(members, null, 2));
+    console.log('Данные участников успешно сохранены!');
+
+    // Сообщение в группу
+    ctx.reply(
+      `Собрано данных: ${members.length} участников. Сохранено в "group_members.json".`,
+    );
   } catch (error) {
-    console.error('Ошибка в обработчике текстового сообщения:', error);
+    console.error('Ошибка при сборе данных участников:', error);
+    ctx.reply('Не удалось собрать данные участников.');
   }
-});
+};
 
 // Запустите бот
 try {
